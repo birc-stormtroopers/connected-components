@@ -117,3 +117,188 @@ It isn't super efficient, since we have to look at the components for all nodes 
 
 [^1]: You can of course return before the loop if `cv == cw`, and that would be a good optimisation, but it doesn't change the worst case running time, so to keep the code simple I have left that out.
 
+For our example from above, let's say that the first edge we process is `(2,1)`. We are in the initial state where `comp[2] == 2` and `comp[1] == 1` and we need to merge the two components by setting all nodes that point to `1` to point to `2` instead. In the figure below, I have shown the new value on the right, above the `comp` list and as a new edge.
+
+![Running simple 1](figs/comp/running%20simple.png)
+
+After the update, nodes `2` and `1` will be in the same component, represented by `comp[v] == 2`.
+
+If we add edge `(0,1)` we should move all nodes `v` with `comp[v] == comp[1] == 2` (those are nodes `1` and `2`) to component `comp[0] == 0`.
+
+![Running simple 2](figs/comp/running%20simple%201.png)
+
+If we then add edge `(3,4)`, we should move nodes with component `comp[v] == comp[4] == 4` to component `comp[3] == 3`:
+
+![Running simple 3](figs/comp/running%20simple%202.png)
+
+If we continue doing this for each edge, we will eventually have merged all components that have an edge between them, and the invariant guarantees that we have the right solution.
+
+```python
+def components(n, edges):
+    """
+    Compute connected components.
+
+    Compute the connected components for n nodes based on the
+    edges. All the nodes listed in the edges must be values in
+    the range 0 <= ... < n.
+    """
+    components = list(range(n))
+    for v, w in edges:
+        assert 0 <= v < n and 0 <= w < n
+        union(components, v, w)
+    return components
+```
+
+The running time is not impressive. We need to process each edge; let’s say that there are `e` of those, and for each edge, we have to run through the components; there are `n` of those, so we end up with `O(en)`. In a number of steps, though, we can improve on this.
+
+### Components as forests
+
+The first step we take won't get us to a better running time, but it gives us a new way of representing components that we can exploit in better methods.
+
+The key idea will be that `comp[v]` doesn't have to point to a representative for `v`'s component. Instead, we can represent components as a forest of trees, where the forest has a node for each of our graph's node, and where nodes connected in the same tree are interpreted as being part of the same component.
+
+If this doesn't make much sense yet, then read on and hopefully it will soon.
+
+We will use `comp` to represent a forest. This is not a normal forest but a computer science forest, and it means that each node has zero or more "parents" (and really nothing more, in this setting). For node `v`, `comp[v]` will point to `v`'s parent, or it will be `-1` if `v` is doesn't have a parent (and thus is a root).
+
+Initially, we will have all the nodes be their own components, which in this framework means that they are trees consisting only of themselves. Since the nodes are not connected to anything else, each will also be a root.
+
+![Initial setup for forests](figs/comp/initial-components-forest.png)
+
+When we wish to join two components, we have to merge two trees. We do this by making the root of one of the trees the parent of the root of the other. Doing this will change the root of all of the children in the component we merge into the other.
+
+To get the root of any node's tree, we can run up the sequence of parents (represented in the `comp` list, that I will call `f` in the code to reflect that it represents forests):
+
+```python
+def is_root(f: list[int], v: int) -> bool:
+    """Return True if v is a root."""
+    return f[v] == -1
+
+
+def root(f: list[int], v: int) -> int:
+    """Locate the root of v's tree."""
+    while not is_root(f, v):
+        v = f[v]
+    return v
+```
+
+Merging two components then looks like this:
+
+```python
+def union(f: list[int], v: int, w: int) -> None:
+    """Merge v's and w's components and update comp accordingly."""
+    f[root(f, v)] = root(f, w)
+```
+
+Surprisingly simple, don't you think?
+
+Let's get back to the example and handle the first edge, the one from `2` to `1`. Before we merge the components, `1` and `2` are both roots of their own tree, so `root(1) == 1` and `root(2) == 1`. We will merge the second tree into the first, so we want to set the root of `1` to `2`:
+
+![Running forest 1](figs/comp/running-forest.png)
+
+If the next edge is `(0,1)` we want to merge the trees containing `0` and `1`. The first is just a singleton with root `root(0) == 0`, but the second is the tree containing both `1` and `2`, with `2` as the root. We want to merge the second tree into the first, so we need to change the root of `2` to point to `0`:
+
+![Running forest 2](figs/comp/running-forest%201.png)
+
+For the main algorithm, all that changes is the initial value for `comp`. It should no longer be the numbers `[0, 1, 2, ..., n - 1]` but all `-1` to indicate that all the components are their own root.
+
+```python
+def components(n, edges):
+    """
+    Compute connected components.
+
+    Computes the connected components for n nodes based on the
+    edges. All the nodes listed in the edges must be values in
+    the range 0 <= ... < n.
+    """
+    components = [-1] * n
+    for v, w in edges:
+        assert 0 <= v < n and 0 <= w < n
+        union(components, v, w)
+    return components
+```
+
+As I wrote at the start of this section, we don't improve the running time by this. It is possible to have long skinny trees such that `root(v)` has to run through `O(n)` nodes, and that means each `union()` will take linear time, so we end up with an `O(n²)` algorithm. (Ok, it is better than `O(en)` since that can be in `O(n³)`, but it still isn't great).
+
+To improve on this, we need to avoid tall trees. We want short and fat trees instead, where there is never too far from any node to its root. What we want to do, is to balance the trees as we build them.
+
+### Balancing trees
+
+I won't show it here because we see similar proofs many places later in CTiB, but I will claim that if you always make sure to merge the smallest tree into the largest and not the other way around, then the depth of the constructed trees will be logarithmic. That means each search for a root will run in `O(log n)`, and the total running time becomes `O(n log n)`.
+
+All we have to do is keep track of the size of the trees. We could use a separate list for that: `size`. It would initially have `size[v] == 1` for all the singleton trees. Whenever we merge two trees of size `size[v]` and `size[w]`, we merge the smaller into the larger^[2], and the new tree will have size `size[v] + size[w]`.
+
+
+[^2]: It doesn't matter if we keep track of the height or total size of trees; you can do either, and it still works.
+
+It turns out, though, that we don't need a separate list. We only need to know the size of nodes that are roots (which is good since updating `size` for all nodes takes too long), and roots don't need a value for their parent (they don't have one), so we can make `comp[v]` the size of the tree if `v` is a root, and make it the parent of `v` if it is not.
+
+We need to be able to distinguish between roots and non-roots, though, but we have both positive and negative numbers, so we can make sizes negative (you cannot have size zero anyway), and deal with it that way.
+
+```python
+def is_size(v: int) -> bool:
+    """Check if v is size."""
+    return v < 0
+
+
+def is_node(v: int) -> bool:
+    """Check if v is a node."""
+    return v >= 0
+
+
+def size(v: int) -> int:
+    """Cast sizes to integers."""
+    assert is_size(v)
+    return -v
+
+
+def to_size(v: int) -> int:
+    """Cast integers to sizes."""
+    return -v
+```
+
+To get the root of a tree, search up as long as the parent is a node. If the parent is a size (i.e. negative), then we are at the root.
+
+```python
+def root(f: list[int], v: int) -> int:
+    """Locate the root of v's tree."""
+    parent = f[v]
+    while is_node(parent):
+        v, parent = parent, f[parent]
+    return v
+```
+
+When you merge two components, find their roots, check their sizes, and merge the smaller tree into the larger:
+
+```python
+def union(f: list[int], v: int, w: int) -> None:
+    """Merge v's and w's components and update comp accordingly."""
+    root_v, root_w = root(f, v), root(f, w)
+    size_w, size_v = size(f[root_w]), size(f[root_v])
+    new_size = to_size(size_w + size_v)
+
+    # make the larger tree the root
+    if size_w < size_v:
+        root_v, root_w = root_w, root_v
+    f[root_v] = root_w
+    f[root_w] = new_size
+```
+
+**FIXME: example**
+
+### Path contraction
+
+```python
+def root(f: list[int], v: int) -> int:
+    """Locate the root of v's tree."""
+    # Locate the root by running up the path
+    root, parent = v, f[v]
+    while is_node(parent):
+        root, parent = parent, f[parent]
+
+    # Then contract the path to point to the root
+    while v != root:
+        v, f[v] = f[v], root
+
+    return root
+```

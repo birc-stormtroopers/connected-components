@@ -13,76 +13,45 @@ but the proof is more involved and it hardly matters for anyone
 ever...)
 """
 
-from __future__ import annotations
-from typing import NewType, Union, TypeGuard, cast
 
-
-# The following is just for annotating the code to keep track of the
-# kind of objects we are working with. It does not affect the function
-# of any of the functions.
-
-# Nodes are represented as integers.
-Node = NewType('Node', int)
-# Edges are pairs of nodes.
-Edge = NewType('Edge', tuple[Node, Node])
-# A tree size is also just an integer
-Size = NewType('Size', int)
-# Components are represented by a forest of trees. Roots do not
-# store a parent node but rather a Size, and we use negative
-# numbers to recognise those.
-Forest = NewType('Forest', list[Union[Node, Size]])
-
-
-def is_size(v: Node | Size) -> TypeGuard[Size]:
+def is_size(v: int) -> bool:
     """Check if v is size."""
     return v < 0
 
 
-def is_node(v: Node | Size) -> TypeGuard[Node]:
+def is_node(v: int) -> bool:
     """Check if v is a node."""
     return v >= 0
 
 
-def size(v: Node | Size) -> int:
+def size(v: int) -> int:
     """Cast sizes to integers."""
     assert is_size(v)
-    return -int(v)
+    return -v
 
 
-def to_size(v: int) -> Size:
+def to_size(v: int) -> int:
     """Cast integers to sizes."""
-    return Size(-v)
+    return -v
 
 
-def root(f: Forest, v: Node) -> Node:
+def root(f: list[int], v: int) -> int:
     """Locate the root of v's forest."""
-    # If v is a root, we are alread done
-    if is_size(f[v]):
-        return v
-
-    # Locate the real root by running up the path
+    # Locate the root by running up the path
     root, parent = v, f[v]
     while is_node(parent):
         root, parent = parent, f[parent]
-    assert is_node(root), "The root index is a node"
-    assert is_size(parent), "The root's parent is a size"
 
-    # Then contract the path so everyone
-    # points to the root
-    while f[v] != root:
+    # Then contract the path to point to the root
+    while v != root:
         v, f[v] = f[v], root
+
     return root
 
 
-def union(f: Forest, v: Node, w: Node) -> None:
+def union(f: list[int], v: int, w: int) -> None:
     """Merge v's and w's components and update comp accordingly."""
-    # Get the components of the two nodes.
     root_v, root_w = root(f, v), root(f, w)
-    if root_v == root_w:
-        return  # They are already in the same component
-
-    # Make one's root point to the other. Make the one with
-    # the largest size the parent.
     size_w, size_v = size(f[root_w]), size(f[root_v])
     new_size = to_size(size_w + size_v)
 
@@ -93,7 +62,7 @@ def union(f: Forest, v: Node, w: Node) -> None:
     f[root_w] = new_size
 
 
-def components(n: int, edges: list[Edge]) -> Forest:
+def components(n: int, edges: list[tuple[int, int]]) -> list[int]:
     """
     Compute connected components.
 
@@ -101,16 +70,21 @@ def components(n: int, edges: list[Edge]) -> Forest:
     edges. All the nodes listed in the edges must be values in
     the range 0 <= ... < n.
 
-    >>> comp = components(5, [(0, 1), (2, 1), (3, 4), (1, 3)])
+    >>> comp = components(5, [(0, 1), (2, 1), (3, 4)])
     >>> assert root(comp, 0) == root(comp, 1)
     >>> assert root(comp, 1) == root(comp, 2)
     >>> assert root(comp, 3) == root(comp, 4)
-    >>> assert root(comp, 0) == root(comp, 3)
+    >>> assert root(comp, 0) != root(comp, 3)
     """
     # Initially, each node has its own component of size 1
-    components = Forest([to_size(1) for i in range(n)])
+    components = [to_size(1) for i in range(n)]
     for v, w in edges:
         assert 0 <= v < n and 0 <= w < n
+        print('merging', v, w)
         union(components, v, w)
+        print(components)
 
     return components
+
+
+print(components(5, [(0, 1), (2, 1), (3, 4)]))

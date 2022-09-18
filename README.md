@@ -113,5 +113,7 @@ def union(comp: list[int], v: int, w: int) -> None:
             comp[u] = cv
 ```
 
-It isn't super efficient, since we have to look at the components for all nodes each time we join two components, but it gets the job done.^[You can of course return before the loop if `cv == cw`, and that would be a good optimisation, but it doesn't change the worst case running time, so to keep the code simple I have left that out.]
+It isn't super efficient, since we have to look at the components for all nodes each time we join two components, but it gets the job done.[^1]
+
+[^1]: You can of course return before the loop if `cv == cw`, and that would be a good optimisation, but it doesn't change the worst case running time, so to keep the code simple I have left that out.
 

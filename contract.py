@@ -38,9 +38,9 @@ def to_size(v: int) -> int:
 def root(f: list[int], v: int) -> int:
     """Locate the root of v's forest."""
     # Locate the root by running up the path
-    root, parent = v, f[v]
-    while is_node(parent):
-        root, parent = parent, f[parent]
+    root = v
+    while is_node(f[root]):
+        root = f[root]
 
     # Then contract the path to point to the root
     while v != root:
@@ -76,14 +76,10 @@ def components(n: int, edges: list[tuple[int, int]]) -> list[int]:
     >>> assert root(comp, 3) == root(comp, 4)
     >>> assert root(comp, 0) != root(comp, 3)
     """
-    # Initially, each node has its own component of size 1
     components = [to_size(1) for i in range(n)]
     for v, w in edges:
         assert 0 <= v < n and 0 <= w < n
-        print('merging', v, w)
         union(components, v, w)
-        print(components)
-
     return components
 
 

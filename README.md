@@ -218,15 +218,15 @@ def components(n, edges):
     return components
 ```
 
-As I wrote at the start of this section, we don't improve the running time by this. It is possible to have long skinny trees such that `root(v)` has to run through `O(n)` nodes, and that means each `union()` will take linear time, so we end up with an `O(n²)` algorithm. (Ok, it is better than `O(en)` since that can be in `O(n³)`, but it still isn't great).
+As I wrote at the start of this section, we don't improve the running time by this. It is possible to have long skinny trees such that `root(v)` has to run through `O(n)` nodes, and that means each `union()` will take linear time, so we end up with an `O(en)` algorithm.
 
 To improve on this, we need to avoid tall trees. We want short and fat trees instead, where there is never too far from any node to its root. What we want to do, is to balance the trees as we build them.
 
 ### Balancing trees
 
-I won't show it here because we see similar proofs many places later in CTiB, but I will claim that if you always make sure to merge the smallest tree into the largest and not the other way around, then the depth of the constructed trees will be logarithmic. That means each search for a root will run in `O(log n)`, and the total running time becomes `O(n log n)`.
+I won't show it here because we see similar proofs many places later in CTiB, but I will claim that if you always make sure to merge the smallest tree into the largest and not the other way around, then the depth of the constructed trees will be logarithmic. That means each search for a root will run in `O(log n)`, and the total running time becomes `O(e log n)`.
 
-All we have to do is keep track of the size of the trees. We could use a separate list for that: `size`. It would initially have `size[v] == 1` for all the singleton trees. Whenever we merge two trees of size `size[v]` and `size[w]`, we merge the smaller into the larger^[2], and the new tree will have size `size[v] + size[w]`.
+All we have to do is keep track of the size of the trees. We could use a separate list for that: `size`. It would initially have `size[v] == 1` for all the singleton trees. Whenever we merge two trees of size `size[v]` and `size[w]`, we merge the smaller into the larger[^2], and the new tree will have size `size[v] + size[w]`.
 
 
 [^2]: It doesn't matter if we keep track of the height or total size of trees; you can do either, and it still works.
@@ -261,10 +261,9 @@ To get the root of a tree, search up as long as the parent is a node. If the par
 
 ```python
 def root(f: list[int], v: int) -> int:
-    """Locate the root of v's tree."""
-    parent = f[v]
-    while is_node(parent):
-        v, parent = parent, f[parent]
+    """Locate the root of v's forest."""
+    while is_node(f[v]):
+        v = f[v]
     return v
 ```
 
@@ -284,17 +283,21 @@ def union(f: list[int], v: int, w: int) -> None:
     f[root_w] = new_size
 ```
 
-**FIXME: example**
+If each joining costs `O(log n)`, the running time is down to `O(e log n)`. We can improve on this further, however.
 
 ### Path contraction
 
+Each time we search for a root, we just need to find the root of the current tree. The tree doesn't have to keep its current form, as long as all the nodes in it are still connected. If we took all the nodes we found during a search for the root, and pointed all of them to the current root, we might spend twice as long on the procedure, but it won't change asymptotic running time. It will, however, shorten the path for any further query that involves any of these nodes.
+
+Implementing this strategy just involves updating the `root()` function:
+
 ```python
 def root(f: list[int], v: int) -> int:
-    """Locate the root of v's tree."""
+    """Locate the root of v's forest."""
     # Locate the root by running up the path
-    root, parent = v, f[v]
-    while is_node(parent):
-        root, parent = parent, f[parent]
+    root = v
+    while is_node(f[root]):
+        root = f[root]
 
     # Then contract the path to point to the root
     while v != root:
@@ -302,3 +305,7 @@ def root(f: list[int], v: int) -> int:
 
     return root
 ```
+
+Every node on the path from `v` gets reassigned its parent to the root of the tree.
+
+While I won't show that here, the running time over `e` union calculations reduces to `O(e ⍺(n))` where `⍺(n)` is the [inverse Ackerman function](https://en.wikipedia.org/wiki/Ackermann_function#Inverse), a function that grows so slow that it is practically constant in the real world.

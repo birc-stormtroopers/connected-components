@@ -33,9 +33,8 @@ def to_size(v: int) -> int:
 
 def root(f: list[int], v: int) -> int:
     """Locate the root of v's forest."""
-    parent = f[v]
-    while is_node(parent):
-        v, parent = parent, f[parent]
+    while is_node(f[v]):
+        v = f[v]
     return v
 
 
@@ -71,3 +70,6 @@ def components(n: int, edges: list[tuple[int, int]]) -> list[int]:
         assert 0 <= v < n and 0 <= w < n
         union(components, v, w)
     return components
+
+
+print(components(5, [(0, 1), (2, 1), (3, 4)]))
